@@ -1,0 +1,62 @@
+{
+    "environment_setup": {
+        "build_cmds": [
+        ],
+        "startup_cmds": [
+            "sudo rabbitmq-server -detached"
+        ],
+        "statelearner_setup": [
+            "git clone https://github.com/jderuiter/statelearner.git",
+            "bash -c 'cd statelearner && mvn package shade:shade'"
+        ]
+    },
+    "slime_config": {
+        "statelearner_port": 8888,
+        "statelearner_cmd": "java -jar statelearner/target/stateLearner-0.0.1-SNAPSHOT.jar statelearner.properties",
+        "custom_module": null,
+        "mitm_timeout": 4,
+        "noflow_timeout": 1,
+        "ludicrous_speed": true,
+        "plaid": true
+    },
+    "sut_controllers": {
+        "Server": {
+            "remote_credentials": null,
+            "msg_parser": "string_parser",
+            "controller_class": "SUT_uflow",
+            "enable_tracing": true,
+            "controller_options": {
+                "cmd_start": "python3 server.py",
+                "cmd_stop": "pkill -9 -f 'python3 server.py'",
+                "cmd_uflow": "pythonflow-bpfcc",
+                "cmd_run": "python3 server.py",
+                "cmd_pid": "pgrep -f 'python3 server.py'",
+                "trace_filter": ".* -> .*simple_food_order_.*server.*",
+                "docker_cmd_start": "sudo docker run --rm -d --network host --name simple-server simple_food_order python3 /server.py",
+                "docker_cmd_stop": "sudo docker stop simple-server",
+                "listen_port": 9000
+            }
+        },
+        "Client": {
+            "remote_credentials": null,
+            "msg_parser": "string_parser",
+            "controller_class": "Simple_Client_SUT",
+            "enable_tracing": false,
+            "controller_options": {
+                "cmd_start": "python3 client.py",
+                "cmd_stop": "pkill -9 -f 'python3 client.py'",
+                "docker_cmd_start": "sudo docker run --rm -d --network host --name simple-client simple_food_order python3 /client.py",
+                "docker_cmd_stop": "sudo docker stop simple-client"
+            }
+        }
+    },
+    "mitm_controllers": {
+        "Main": {
+            "cmd_start": "mitmdump -p 9001 --mode=reverse:http://localhost:9000 -s mitmproxyaddon.py",
+            "addon_name": "mitmproxyaddon.py",
+            "msg_parser": "string_parser",
+            "msg_fuzzer": "simple_fuzzer",
+            "restart_between_sessions": false
+        }
+    }
+}

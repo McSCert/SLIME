@@ -1,0 +1,14 @@
+diff --git a/uptane/clients/primary.py b/uptane/clients/primary.py
+index f26c271..a833202 100644
+--- a/uptane/clients/primary.py
++++ b/uptane/clients/primary.py
+@@ -1174,6 +1174,9 @@ class Primary(object): # Consider inheriting from Secondary and refactoring.
+             'persistently, it is possible that there is a Man in the Middle '
+             'attack underway.')
+ 
++    for nonce in timeserver_attestation['signed']['nonces']:
++      if nonce not in self.nonces_sent:
++        raise uptane.BadTimeAttestation('Timeserver returned an unexpected time attestation')
+ 
+     # Extract actual time from the timeserver's signed attestation.
+     new_timeserver_time = timeserver_attestation['signed']['time']

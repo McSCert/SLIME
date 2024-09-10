@@ -1,0 +1,96 @@
+{
+    "environment_setup": {
+        "build_cmds": [
+            "sudo docker image rm uptane-fix",
+            "sudo docker build -t uptane-fix -f ./docker-offline/Dockerfile ./docker-offline/"
+        ],
+        "startup_cmds": [
+            "sudo rabbitmq-server -detached"
+        ],
+        "statelearner_setup": [
+            "git clone https://github.com/jderuiter/statelearner.git",
+            "bash -c 'cd statelearner && mvn package shade:shade'"
+        ]
+    },
+    "slime_config": {
+        "statelearner_port": 8888,
+        "statelearner_cmd": "java -jar statelearner/target/stateLearner-0.0.1-SNAPSHOT.jar statelearner.properties",
+        "custom_module": "custom_parser.py",
+        "preseed": ["m-allow-rr", "m-allow-rr", "m-allow-rr", "m-allow-rr"],
+        "enable_preseed": true,
+        "mitm_interactive_input_alphabet": ["m-allow-rr", "m-killreq-rr", "m-killres-rr", "m-replacereq-rr", "m-smartreplayreq-rr"],
+        "mitm_interactive_web_port": 8020,
+        "mitm_timeout": 16,
+        "noflow_timeout": 0.2,
+        "ludicrous_speed": true,
+        "plaid": true
+    },
+    "sut_controllers": {
+        "Server": {
+            "remote_credentials": null,
+            "msg_parser": "string_parser",
+            "controller_class": "SUT_uflow_no_tracing",
+            "enable_tracing": false,
+            "controller_options": {
+                "cmd_start": "sudo docker run --rm -d --network host --name uptane-server uptane-fix sh -c /start-server.sh",
+                "cmd_ready": "sudo docker exec uptane-server cat /ready.txt",
+                "cmd_stop": "sudo docker stop uptane-server",
+                "cmd_startup": "sudo docker run --rm -id -v /sys/kernel/debug:/sys/kernel/debug -v /sys/fs/cgroup:/sys/fs/cgroup -v /sys/fs/bpf:/sys/fs/bpf --privileged --pid host --network host --name uptane-server uptane-fix",
+                "cmd_run": "sudo docker exec uptane-server sh -c /start-server.sh",
+                "cmd_uflow": "pythonflow-bpfcc",
+                "cmd_pid": "pgrep -f demo/start-server.py",
+                "trace_filter": ".* -> .*(uptane|tuf).*",
+                "trace_filter_exclude": "pseudorandom_function"
+            }
+        },
+        "Primary": {
+            "remote_credentials": null,
+            "msg_parser": "string_parser",
+            "controller_class": "SUT_uflow",
+            "enable_tracing": true,
+            "controller_options": {
+                "cmd_start": "sudo docker run --rm -d --network host --name uptane-primary uptane-fix sh -c /start-client.sh",
+                "cmd_startup": "sudo docker run --rm -id -v /sys/kernel/debug:/sys/kernel/debug -v /sys/fs/cgroup:/sys/fs/cgroup -v /sys/fs/bpf:/sys/fs/bpf --privileged --pid host --network host --name uptane-primary uptane-fix",
+                "cmd_run": "sudo docker exec uptane-primary sh -c /start-client.sh",
+                "cmd_uflow": "sudo ./uflow.py -l python",
+                "cmd_stop": "sudo docker stop uptane-primary",
+                "trace_filter": ".* -> .*(uptane|tuf).*"
+            },
+            "sut_input_alphabet": {
+                "update": [""]
+            }
+        }
+    },
+    "mitm_controllers": {
+        "Primary_repo": {
+            "cmd_start": "mitmdump -p 30702 --mode reverse:http://0.0.0.0:30701 -s mitmproxyaddon_p.py",
+            "addon_name": "mitmproxyaddon_p.py",
+            "msg_parser": "uptane_xml_parser",
+            "msg_fuzzer": "simple_fuzzer"
+        },
+        "Timeserver": {
+            "cmd_start": "mitmdump -p 30602 --mode reverse:http://0.0.0.0:30601 -s mitmproxyaddon_t.py",
+            "addon_name": "mitmproxyaddon_t.py",
+            "msg_parser": "uptane_xml_parser",
+            "msg_fuzzer": "simple_fuzzer"
+        },
+        "Director": {
+            "cmd_start": "mitmdump -p 30502 --mode reverse:http://0.0.0.0:30501 -s mitmproxyaddon_d.py",
+            "addon_name": "mitmproxyaddon_d.py",
+            "msg_parser": "uptane_xml_parser",
+            "msg_fuzzer": "simple_fuzzer"
+        },
+        "Director_repo": {
+            "cmd_start": "mitmdump -p 30402 --mode reverse:http://0.0.0.0:30401 -s mitmproxyaddon_r.py",
+            "addon_name": "mitmproxyaddon_r.py",
+            "msg_parser": "uptane_xml_parser",
+            "msg_fuzzer": "simple_fuzzer"
+        },
+        "Image_repo": {
+            "cmd_start": "mitmdump -p 30302 --mode reverse:http://0.0.0.0:30301 -s mitmproxyaddon_i.py",
+            "addon_name": "mitmproxyaddon_i.py",
+            "msg_parser": "uptane_xml_parser",
+            "msg_fuzzer": "simple_fuzzer"
+        }
+    }
+}
